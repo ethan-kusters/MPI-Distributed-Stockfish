@@ -102,8 +102,8 @@ namespace {
   // MobilityBonus[PieceType-2][attacked] contains bonuses for middle and end game,
   // indexed by piece type and number of attacked squares in the mobility area.
   constexpr Score MobilityBonus[][32] = {
-    { S(-75,-76), S(-57,-54), S( -9,-28), S( -2,-10), S(  6,  5), S( 14, 12), // Knights
-      S( 22, 26), S( 29, 29), S( 36, 29) },
+    { S(-62,-81), S(-53,-56), S(-12,-30), S( -4,-14), S(  3,  8), S( 13, 15), // Knights
+      S( 22, 23), S( 28, 27), S( 33, 33) },
     { S(-48,-59), S(-20,-23), S( 16, -3), S( 26, 13), S( 38, 24), S( 51, 42), // Bishops
       S( 55, 54), S( 63, 57), S( 63, 65), S( 68, 73), S( 81, 78), S( 81, 86),
       S( 91, 88), S( 98, 97) },
@@ -127,7 +127,7 @@ namespace {
 
   // RookOnFile[semiopen/open] contains bonuses for each rook when there is
   // no (friendly) pawn on the rook file.
-  constexpr Score RookOnFile[] = { S(20, 7), S(45, 20) };
+  constexpr Score RookOnFile[] = { S(18, 7), S(44, 20) };
 
   // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
   // which piece type attacks which one. Attacks on lesser pieces which are
@@ -151,9 +151,6 @@ namespace {
     S(-30,-14), S(-9, -8), S( 0,  9), S( -1,  7)
   };
 
-  // PassedDanger[Rank] contains a term to weight the passed score
-  constexpr int PassedDanger[RANK_NB] = { 0, 0, 0, 3, 7, 11, 20 };
-
   // Assorted bonuses and penalties
   constexpr Score BishopPawns        = S(  3,  7);
   constexpr Score CloseEnemies       = S(  6,  0);
@@ -165,15 +162,15 @@ namespace {
   constexpr Score MinorBehindPawn    = S( 16,  0);
   constexpr Score Overload           = S( 13,  6);
   constexpr Score PawnlessFlank      = S( 19, 84);
-  constexpr Score RookOnPawn         = S( 10, 30);
+  constexpr Score RookOnPawn         = S( 10, 29);
   constexpr Score SliderOnQueen      = S( 42, 21);
-  constexpr Score ThreatByKing       = S( 23, 76);
+  constexpr Score ThreatByKing       = S( 22, 78);
   constexpr Score ThreatByPawnPush   = S( 45, 40);
   constexpr Score ThreatByRank       = S( 16,  3);
   constexpr Score ThreatBySafePawn   = S(173,102);
-  constexpr Score TrappedRook        = S( 92,  0);
+  constexpr Score TrappedRook        = S( 96,  5);
   constexpr Score WeakQueen          = S( 50, 10);
-  constexpr Score WeakUnopposedPawn  = S(  5, 29);
+  constexpr Score WeakUnopposedPawn  = S( 15, 19);
 
 #undef S
 
@@ -415,13 +412,13 @@ namespace {
     Bitboard kingFlank, weak, b, b1, b2, safe, unsafeChecks;
 
     // King shelter and enemy pawns storm
-    Score score = pe->king_safety<Us>(pos, ksq);
+    Score score = pe->king_safety<Us>(pos);
 
     // Find the squares that opponent attacks in our king flank, and the squares
     // which are attacked twice in that flank but not defended by our pawns.
     kingFlank = KingFlank[file_of(ksq)];
     b1 = attackedBy[Them][ALL_PIECES] & kingFlank & Camp;
-    b2 = b1 & attackedBy2[Them] & ~attackedBy[Us][PAWN];
+    b2 = b1 & attackedBy2[Them];
 
     int tropism = popcount(b1) + popcount(b2);
 
@@ -480,15 +477,12 @@ namespace {
                      +   4 * tropism
                      - 873 * !pos.count<QUEEN>(Them)
                      -   6 * mg_value(score) / 8
+                     +       mg_value(mobility[Them] - mobility[Us])
                      -   30;
 
         // Transform the kingDanger units into a Score, and subtract it from the evaluation
         if (kingDanger > 0)
-        {
-            int mobilityDanger = mg_value(mobility[Them] - mobility[Us]);
-            kingDanger = std::max(0, kingDanger + mobilityDanger);
             score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
-        }
     }
 
     // Penalty when our king is on a pawnless flank
@@ -632,12 +626,12 @@ namespace {
         assert(!(pos.pieces(Them, PAWN) & forward_file_bb(Us, s + Up)));
 
         int r = relative_rank(Us, s);
-        int w = PassedDanger[r];
 
         Score bonus = PassedRank[r];
 
-        if (w)
+        if (r > RANK_3)
         {
+            int w = (r-2) * (r-2) + 2;
             Square blockSq = s + Up;
 
             // Adjust bonus based on the king's proximity
@@ -678,7 +672,7 @@ namespace {
 
                 bonus += make_score(k * w, k * w);
             }
-        } // w != 0
+        } // rank > RANK_3
 
         // Scale down bonus for candidate passers which need more than one
         // pawn push to become passed, or have a pawn in front of them.
