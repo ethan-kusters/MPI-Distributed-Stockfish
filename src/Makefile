@@ -410,7 +410,7 @@ help:
         clang-profile-use clang-profile-make
 
 build: config-sanity
-	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) all
+	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) -lmpi all
 
 profile-build: config-sanity objclean profileclean
 	@echo ""

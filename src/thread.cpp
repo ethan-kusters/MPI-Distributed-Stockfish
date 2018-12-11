@@ -20,7 +20,7 @@
 
 #include <algorithm> // For std::count
 #include <cassert>
-#include <mpi.h>
+#include <mpiCC.h>
 
 #include "movegen.h"
 #include "search.h"

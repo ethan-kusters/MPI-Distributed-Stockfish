@@ -19,7 +19,7 @@
 */
 
 #include <iostream>
-#include <mpi.h>
+#include <mpicc>
 
 #include "bitboard.h"
 #include "position.h"
@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
   std::cout << engine_info() << my_rank << std::endl;
-
+  printf("test");
   UCI::init(Options);
   PSQT::init();
   Bitboards::init();

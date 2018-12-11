@@ -22,7 +22,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <mpi.h>
+#include <mpiCC.h>
 
 #include "evaluate.h"
 #include "movegen.h"
