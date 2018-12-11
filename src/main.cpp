@@ -19,7 +19,7 @@
 */
 
 #include <iostream>
-#include <mpi.h>
+#include "/usr/include/openmpi-x86_64/mpi.h"
 
 #include "bitboard.h"
 #include "position.h"
