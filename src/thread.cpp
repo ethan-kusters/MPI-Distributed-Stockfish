@@ -20,7 +20,7 @@
 
 #include <algorithm> // For std::count
 #include <cassert>
-#include "/usr/include/openmpi-x86_64/mpi.h"
+#include <mpi.h>
 
 #include "movegen.h"
 #include "search.h"

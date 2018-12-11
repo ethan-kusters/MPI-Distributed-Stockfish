@@ -22,7 +22,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include "/usr/include/openmpi-x86_64/mpi.h"
+#include <mpi.h>
 
 #include "evaluate.h"
 #include "movegen.h"
