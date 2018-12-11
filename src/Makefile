@@ -155,7 +155,7 @@ endif
 
 ifeq ($(COMP),gcc)
 	comp=gcc
-	CXX=g++
+	CXX=/usr/lib64/openmpi/bin/mpicc
 	CXXFLAGS += -pedantic -Wextra -Wshadow
 
 	ifeq ($(ARCH),armv7)
