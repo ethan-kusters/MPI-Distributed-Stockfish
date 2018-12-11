@@ -19,6 +19,7 @@
 */
 
 #include <iostream>
+#include <mpi.h>
 
 #include "bitboard.h"
 #include "position.h"
@@ -33,8 +34,13 @@ namespace PSQT {
 }
 
 int main(int argc, char* argv[]) {
+  int comm_sz;
+  int my_rank;
+  MPI_Init(NULL, NULL);
+  MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-  std::cout << engine_info() << std::endl;
+  std::cout << engine_info() << my_rank << std::endl;
 
   UCI::init(Options);
   PSQT::init();
@@ -45,9 +51,9 @@ int main(int argc, char* argv[]) {
   Pawns::init();
   Threads.set(Options["Threads"]);
   Search::clear(); // After threads are up
-
-  UCI::loop(argc, argv);
+  UCI::loop(argc, argv, my_rank, comm_sz);
 
   Threads.set(0);
+  MPI_Finalize();
   return 0;
 }

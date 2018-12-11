@@ -20,6 +20,7 @@
 
 #include <algorithm> // For std::count
 #include <cassert>
+#include <mpi.h>
 
 #include "movegen.h"
 #include "search.h"
@@ -27,6 +28,7 @@
 #include "uci.h"
 #include "syzygy/tbprobe.h"
 #include "tt.h"
+
 
 ThreadPool Threads; // Global object
 
@@ -159,45 +161,59 @@ void ThreadPool::clear() {
 
 void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
                                 const Search::LimitsType& limits, bool ponderMode) {
+    
+    int my_rank;
+    int comm_sz;
 
-  main()->wait_for_search_finished();
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-  stopOnPonderhit = stop = false;
-  ponder = ponderMode;
-  Search::Limits = limits;
-  Search::RootMoves rootMoves;
+    main()->wait_for_search_finished();
 
-  for (const auto& m : MoveList<LEGAL>(pos))
-      if (   limits.searchmoves.empty()
-          || std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
-          rootMoves.emplace_back(m);
 
-  if (!rootMoves.empty())
-      Tablebases::rank_root_moves(pos, rootMoves);
+    stopOnPonderhit = stop = false;
+    ponder = ponderMode;
+    Search::Limits = limits;
+    Search::RootMoves rootMoves;
 
-  // After ownership transfer 'states' becomes empty, so if we stop the search
-  // and call 'go' again without setting a new position states.get() == NULL.
-  assert(states.get() || setupStates.get());
+    for (const auto& m : MoveList<LEGAL>(pos))
+        if (   limits.searchmoves.empty()
+            || std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
+            rootMoves.emplace_back(m);
 
-  if (states.get())
-      setupStates = std::move(states); // Ownership transfer, states is now empty
+    if (!rootMoves.empty())
+        Tablebases::rank_root_moves(pos, rootMoves);
+    
+    int numRemoved = 0;
+    for (int i = 0; i < rootMoves.size(); i += comm_sz) {
+      rootMoves.erase((rootMoves.begin() + i - numRemoved, rootMoves.begin() + i + comm_sz - numRemoved));
+      numRemoved += (i + comm_sz) - (i - numRemoved);
+    }
 
-  // We use Position::set() to set root position across threads. But there are
-  // some StateInfo fields (previous, pliesFromNull, capturedPiece) that cannot
-  // be deduced from a fen string, so set() clears them and to not lose the info
-  // we need to backup and later restore setupStates->back(). Note that setupStates
-  // is shared by threads but is accessed in read-only mode.
-  StateInfo tmp = setupStates->back();
+    printf("Root moves: %lu\n", rootMoves.size());
+    // After ownership transfer 'states' becomes empty, so if we stop the search
+    // and call 'go' again without setting a new position states.get() == NULL.
+    assert(states.get() || setupStates.get());
 
-  for (Thread* th : *this)
-  {
-      th->nodes = th->tbHits = th->nmpMinPly = 0;
-      th->rootDepth = th->completedDepth = DEPTH_ZERO;
-      th->rootMoves = rootMoves;
-      th->rootPos.set(pos.fen(), pos.is_chess960(), &setupStates->back(), th);
-  }
+    if (states.get())
+        setupStates = std::move(states); // Ownership transfer, states is now empty
 
-  setupStates->back() = tmp;
+    // We use Position::set() to set root position across threads. But there are
+    // some StateInfo fields (previous, pliesFromNull, capturedPiece) that cannot
+    // be deduced from a fen string, so set() clears them and to not lose the info
+    // we need to backup and later restore setupStates->back(). Note that setupStates
+    // is shared by threads but is accessed in read-only mode.
+    StateInfo tmp = setupStates->back();
 
-  main()->start_searching();
+    for (Thread* th : *this)
+    {
+        th->nodes = th->tbHits = th->nmpMinPly = 0;
+        th->rootDepth = th->completedDepth = DEPTH_ZERO;
+        th->rootMoves = rootMoves;
+        th->rootPos.set(pos.fen(), pos.is_chess960(), &setupStates->back(), th);
+    }
+
+    setupStates->back() = tmp;
+
+    main()->start_searching();
 }

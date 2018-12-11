@@ -22,6 +22,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <mpi.h>
 
 #include "evaluate.h"
 #include "movegen.h"
@@ -32,6 +33,7 @@
 #include "tt.h"
 #include "uci.h"
 #include "syzygy/tbprobe.h"
+
 
 using namespace std;
 
@@ -107,7 +109,6 @@ namespace {
   // the search.
 
   void go(Position& pos, istringstream& is, StateListPtr& states) {
-
     Search::LimitsType limits;
     string token;
     bool ponderMode = false;
@@ -132,6 +133,18 @@ namespace {
         else if (token == "infinite")  limits.infinite = 1;
         else if (token == "ponder")    ponderMode = true;
 
+    int buffer = limits.depth;
+    MPI_Send(&buffer, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+
+    Threads.start_thinking(pos, states, limits, ponderMode);
+  }
+
+  void mpi_go(Position& pos, int depthLimit, StateListPtr& states) {
+    Search::LimitsType limits;
+    string token;
+    bool ponderMode = false;
+
+    limits.depth = depthLimit;
     Threads.start_thinking(pos, states, limits, ponderMode);
   }
 
@@ -186,8 +199,7 @@ namespace {
 /// run 'bench', once the command is executed the function returns immediately.
 /// In addition to the UCI ones, also some additional debug commands are supported.
 
-void UCI::loop(int argc, char* argv[]) {
-
+void UCI::loop(int argc, char* argv[], int my_rank, int comm_sz) {
   Position pos;
   string token, cmd;
   StateListPtr states(new std::deque<StateInfo>(1));
@@ -199,6 +211,15 @@ void UCI::loop(int argc, char* argv[]) {
       cmd += std::string(argv[i]) + " ";
 
   do {
+      if(my_rank != 0) {
+        int receivedCmd = 0;
+        MPI_Recv(&receivedCmd, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
+
+        if(receivedCmd > 0) {
+            mpi_go(pos, receivedCmd, states);
+        }
+      }
+
       if (argc == 1 && !getline(cin, cmd)) // Block here waiting for input or EOF
           cmd = "quit";
 
@@ -220,13 +241,15 @@ void UCI::loop(int argc, char* argv[]) {
       else if (token == "ponderhit")
           Threads.ponder = false; // Switch to normal search
 
-      else if (token == "uci")
+      else if (token == "uci") {
           sync_cout << "id name " << engine_info(true)
                     << "\n"       << Options
+                    << "\n\nMPI world size: " << comm_sz << "\n"
                     << "\nuciok"  << sync_endl;
+      }
 
       else if (token == "setoption")  setoption(is);
-      else if (token == "go")         go(pos, is, states);
+      else if (token == "go") go(pos, is, states);       
       else if (token == "position")   position(pos, is, states);
       else if (token == "ucinewgame") Search::clear();
       else if (token == "isready")    sync_cout << "readyok" << sync_endl;
