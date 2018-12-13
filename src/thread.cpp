@@ -178,19 +178,33 @@ void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
 
     for (const auto& m : MoveList<LEGAL>(pos))
         if (   limits.searchmoves.empty()
-            || std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
+            || std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m)) {
             rootMoves.emplace_back(m);
+        }
 
-    if (!rootMoves.empty())
-        Tablebases::rank_root_moves(pos, rootMoves);
+    if (!rootMoves.empty()){
+      Tablebases::rank_root_moves(pos, rootMoves);
+    }
     
-    int numRemoved = 0;
-    for (int i = 0; i < rootMoves.size(); i += comm_sz) {
-      rootMoves.erase((rootMoves.begin() + i - numRemoved, rootMoves.begin() + i + comm_sz - numRemoved));
-      numRemoved += (i + comm_sz) - (i - numRemoved);
+    if(my_rank < rootMoves.size()){
+      rootMoves.erase(rootMoves.begin(), rootMoves.begin() + my_rank);
+    }
+    
+    for (int i = 0; i < rootMoves.size(); i += 1) {
+      if(i + comm_sz < rootMoves.size()) { 
+        rootMoves.erase(rootMoves.begin() + i, rootMoves.begin() + i + comm_sz);
+      } else {
+        rootMoves.erase(rootMoves.begin() + i, rootMoves.end());
+        break;
+      }
     }
 
-    printf("Root moves: %lu\n", rootMoves.size());
+    
+
+    for(auto &move : rootMoves) {
+      //std::cout << "My rank: " << my_rank << ": " << UCI::move(move.pv[0], false) << " my limit: " << limits.movetime << std::endl;
+    }
+
     // After ownership transfer 'states' becomes empty, so if we stop the search
     // and call 'go' again without setting a new position states.get() == NULL.
     assert(states.get() || setupStates.get());
