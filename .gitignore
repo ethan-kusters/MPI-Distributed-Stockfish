@@ -2,3 +2,5 @@
 *.o
 src/.depend
 src/stockfish
+src/true
+.vscode/settings.json
