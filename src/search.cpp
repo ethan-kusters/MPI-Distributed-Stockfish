@@ -462,9 +462,9 @@ void Thread::search() {
           // Sort the PV lines searched so far and update the GUI
           std::stable_sort(rootMoves.begin() + pvFirst, rootMoves.begin() + pvIdx + 1);
 
-          if (    mainThread
+          /*if (    mainThread
               && (Threads.stop || pvIdx + 1 == multiPV || Time.elapsed() > 3000))
-              sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
+              sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;*/
       }
 
       if (!Threads.stop)
