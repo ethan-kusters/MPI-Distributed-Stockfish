@@ -24,6 +24,7 @@
 #include <cstring>   // For std::memset
 #include <iostream>
 #include <sstream>
+#include <string>
 #include "/usr/include/openmpi-x86_64/mpi.h"
 
 #include "evaluate.h"
@@ -290,15 +291,49 @@ void MainThread::search() {
 
   int my_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  
+  int bestScore = bestThread->rootMoves[0].score;
+  string bestMove = UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
+  unsigned int totalNodes = Threads.nodes_searched();
 
-  sync_cout << "bestmove for rank " << my_rank << ": " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960()) << " score " << bestThread->rootMoves[0].score;
+  if(my_rank == 0) {
+    int comm_sz = 0;
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+    int receivedScore;
+    unsigned int receivedNodes;
+    for(int i = 1; i < comm_sz; i++) {
+        MPI_Recv(&receivedScore, 1, MPI_INT, i, 0, MPI_COMM_WORLD, NULL);
+        MPI_Recv(&receivedNodes, 1, MPI_INT, i, 1, MPI_COMM_WORLD, NULL);
+        totalNodes += receivedNodes;
 
-  if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
-      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());
+        MPI_Status status;
+        MPI_Probe(i, 2, MPI_COMM_WORLD, &status);
+        int count;
+        MPI_Get_count(&status, MPI_CHAR, &count);
+        char buf[count];
+        MPI_Recv(&buf, count, MPI_CHAR, i, 2, MPI_COMM_WORLD, &status);
+        if(receivedScore > bestScore) {
+          bestScore = receivedScore;
+          bestMove = buf;
+        }
+    }
+
+    sync_cout << "bestmove " << bestMove << " time " << Time.elapsed() << " nodes " << totalNodes;
+    std::cout << sync_endl;
+  } else {
+    MPI_Send(&bestScore, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+    MPI_Send(&totalNodes, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+    MPI_Send(&bestMove[0], bestMove.size() + 1, MPI_CHAR, 0, 2, MPI_COMM_WORLD);
+  }
+
+  
+
+  /*if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
+      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());*/
 
   /*sync_cout << "score: " << bestThread->rootMoves[0].score << sync_endl;*/
 
-  std::cout << sync_endl;
+  
 }
 
 

@@ -188,21 +188,20 @@ void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
     
     if(my_rank < rootMoves.size()){
       rootMoves.erase(rootMoves.begin(), rootMoves.begin() + my_rank);
-    }
-    
-    for (int i = 0; i < rootMoves.size(); i += 1) {
-      if(i + comm_sz < rootMoves.size()) { 
-        rootMoves.erase(rootMoves.begin() + i, rootMoves.begin() + i + comm_sz);
-      } else {
-        rootMoves.erase(rootMoves.begin() + i, rootMoves.end());
-        break;
+      for (unsigned int i = 1; i < rootMoves.size(); i += 1) {
+        if(i + comm_sz < rootMoves.size()) { 
+          rootMoves.erase(rootMoves.begin() + i, rootMoves.begin() + i + comm_sz);
+        } else {
+          rootMoves.erase(rootMoves.begin() + i, rootMoves.end());
+          break;
+        }
       }
+    } else {
+      rootMoves.clear();
     }
-
-    
 
     for(auto &move : rootMoves) {
-      //std::cout << "My rank: " << my_rank << ": " << UCI::move(move.pv[0], false) << " my limit: " << limits.movetime << std::endl;
+      //std::cout << "My rank: " << my_rank << ": " << UCI::move(move.pv[0], false) << std::endl;
     }
 
     // After ownership transfer 'states' becomes empty, so if we stop the search
