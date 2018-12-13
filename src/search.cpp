@@ -287,7 +287,7 @@ void MainThread::search() {
   /*if (bestThread != this)
       sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;*/
 
-  sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960()) << " time " << Time.elapsed() << " nodes " << Threads.nodes_searched();
+  sync_cout << "\nBest move found: " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960()) << "\nPossible subsequent moves explored: " << Threads.nodes_searched() << "\nTime elapsed (ms): " << Time.elapsed() << "\n";
 
 
   /*if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
