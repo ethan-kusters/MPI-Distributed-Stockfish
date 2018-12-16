@@ -5,6 +5,8 @@ This is a fork of Stockfish that has been distributed using MPI to process in pa
 ### Building and Running
 Your mileage may vary on Windows. On a Unix system simply use: "make build ARCH=x86-64 COMP=gcc" from the src directory in this repository. The code can then be simulated on a single machine using "/usr/lib64/openmpi/bin/mpirun -n 8 stockfish". This repostiroy also includes code specific to running on the distributed MPac lab at California Polytechnic State University. To do this simply run the included setup.py and then "./labmngr.py -v stockfish". It will run across 20 computers. 
 
+### Comparing Timing
+The other branch in this repository ([stockfish-control-master](https://github.com/ethan-kusters/Stockfish/tree/stockfish-control-master)) is the version of Stockfish that was distributed in this branch. It has been slightly modified to match the output of the distributed version and can be used for an apples to apples comparison of the two. 
 
 ### Authors
 This repository was worked on by Ethan Kusters and Erika Kaplan as a part of CPE 469 (Distributed Sytems) at California Polytechnic State University.
