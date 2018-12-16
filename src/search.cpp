@@ -295,6 +295,8 @@ void MainThread::search() {
   int bestScore = bestThread->rootMoves[0].score;
   string bestMove = UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
   unsigned int totalNodes = Threads.nodes_searched();
+  sync_cout << "\nRank " << my_rank << " just finished. Best move found: " << bestMove << " with score: " << bestScore << " and depth " << bestThread->completedDepth;
+  std::cout << sync_endl;
 
   if(my_rank == 0) {
     int comm_sz = 0;
@@ -318,7 +320,7 @@ void MainThread::search() {
         }
     }
 
-    sync_cout << "bestmove " << bestMove << " time " << Time.elapsed() << " nodes " << totalNodes;
+    sync_cout << "\n\nOverall best move found: " << bestMove << "\nPossible subsequent moves explored: " << totalNodes << "\nTotal time elapsed (ms): " << Time.elapsed() << "\n";
     std::cout << sync_endl;
   } else {
     MPI_Send(&bestScore, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);

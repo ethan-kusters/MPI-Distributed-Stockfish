@@ -22,7 +22,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include "/usr/include/openmpi-x86_64/mpi.h"
+#include <mpi.h>
 
 #include "evaluate.h"
 #include "movegen.h"
@@ -116,8 +116,7 @@ namespace {
     limits.startTime = now(); // As early as possible!
 
     while (is >> token) {
-        if (token == "depth")     is >> limits.depth;
-        /*if (token == "searchmoves") {
+        if (token == "searchmoves") {
             while (is >> token) {
                 limits.searchmoves.push_back(UCI::to_move(pos, token));
             }
@@ -129,33 +128,19 @@ namespace {
         else if (token == "binc")      is >> limits.inc[BLACK];
         else if (token == "movestogo") is >> limits.movestogo;
         else if (token == "depth")     is >> limits.depth;
-        else if (token == "nodes")     is >> limits.nodes;
+        else if (token == "moves")     is >> limits.nodes;
         else if (token == "movetime")  is >> limits.movetime;
         else if (token == "mate")      is >> limits.mate;
         else if (token == "perft")     is >> limits.perft;
         else if (token == "infinite")  limits.infinite = 1;
-        else if (token == "ponder")    ponderMode = true;*/
-
+        else if (token == "ponder")    ponderMode = true;
     }
 
-    int buffer = limits.depth;
     int comm_sz;
-
     MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
-
-    for(int i = 1; i < comm_sz; i++) {
-        MPI_Send(&buffer, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-    }
+    limits.nodes = limits.nodes / comm_sz;
 
     Threads.start_thinking(pos, states, limits, ponderMode);
-  }
-
-  void mpi_go(Position& pos, int depthLimit, StateListPtr& states) {
-    Search::LimitsType limits;
-    limits.startTime = now(); 
-
-    limits.depth = depthLimit;
-    Threads.start_thinking(pos, states, limits, false);
   }
 
 
@@ -222,56 +207,67 @@ void UCI::loop(int argc, char* argv[], int my_rank, int comm_sz) {
 
   do {
       if(my_rank != 0) {
-        int receivedCmd = 0;
-        MPI_Recv(&receivedCmd, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
+        /*int receivedCmd = 0;
+        //MPI_Recv(&receivedCmd, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
 
         if(receivedCmd > 0) {
             mpi_go(pos, receivedCmd, states);
-        }
+        }*/
+        
+        MPI_Status status;
+        MPI_Probe(0, 3, MPI_COMM_WORLD, &status);
+        int count;
+        MPI_Get_count(&status, MPI_CHAR, &count);
+        char buf[count];
+        MPI_Recv(&buf, count, MPI_CHAR, 0, 3, MPI_COMM_WORLD, &status);
+        cmd = buf;
       } else {
-
         if (argc == 1 && !getline(cin, cmd)) // Block here waiting for input or EOF
             cmd = "quit";
 
-        istringstream is(cmd);
-
-        token.clear(); // Avoid a stale if getline() returns empty or blank line
-        is >> skipws >> token;
-
-        // The GUI sends 'ponderhit' to tell us the user has played the expected move.
-        // So 'ponderhit' will be sent if we were told to ponder on the same move the
-        // user has played. We should continue searching but switch from pondering to
-        // normal search. In case Threads.stopOnPonderhit is set we are waiting for
-        // 'ponderhit' to stop the search, for instance if max search depth is reached.
-        if (    token == "quit"
-            ||  token == "stop"
-            || (token == "ponderhit" && Threads.stopOnPonderhit))
-            Threads.stop = true;
-
-        else if (token == "ponderhit")
-            Threads.ponder = false; // Switch to normal search
-
-        else if (token == "uci") {
-            sync_cout << "id name " << engine_info(true)
-                        << "\n"       << Options
-                        << "\n\nMPI world size: " << comm_sz << "\n"
-                        << "\nuciok"  << sync_endl;
+        for(int i = 1; i < comm_sz; i++) {
+            MPI_Send(cmd.c_str(), cmd.size() + 1, MPI_CHAR, i, 3, MPI_COMM_WORLD);
         }
-
-        else if (token == "setoption")  setoption(is);
-        else if (token == "go") go(pos, is, states);       
-        else if (token == "position")   position(pos, is, states);
-        else if (token == "ucinewgame") Search::clear();
-        else if (token == "isready")    sync_cout << "readyok" << sync_endl;
-
-        // Additional custom non-UCI commands, mainly for debugging
-        else if (token == "flip")  pos.flip();
-        else if (token == "bench") bench(pos, is, states);
-        else if (token == "d")     sync_cout << pos << sync_endl;
-        else if (token == "eval")  sync_cout << Eval::trace(pos) << sync_endl;
-        else
-            sync_cout << "Unknown command: " << cmd << sync_endl;
       }
+
+    istringstream is(cmd);
+
+    token.clear(); // Avoid a stale if getline() returns empty or blank line
+    is >> skipws >> token;
+
+    // The GUI sends 'ponderhit' to tell us the user has played the expected move.
+    // So 'ponderhit' will be sent if we were told to ponder on the same move the
+    // user has played. We should continue searching but switch from pondering to
+    // normal search. In case Threads.stopOnPonderhit is set we are waiting for
+    // 'ponderhit' to stop the search, for instance if max search depth is reached.
+    if (    token == "quit"
+        ||  token == "stop"
+        || (token == "ponderhit" && Threads.stopOnPonderhit))
+        Threads.stop = true;
+
+    else if (token == "ponderhit")
+        Threads.ponder = false; // Switch to normal search
+
+    else if (token == "uci") {
+        sync_cout << "id name " << engine_info(true)
+                    << "\n"       << Options
+                    << "\n\nMPI world size: " << comm_sz << "\n"
+                    << "\nuciok"  << sync_endl;
+    }
+
+    else if (token == "setoption")  setoption(is);
+    else if (token == "go") go(pos, is, states);       
+    else if (token == "position")   position(pos, is, states);
+    else if (token == "ucinewgame") Search::clear();
+    else if (token == "isready")    sync_cout << "readyok" << sync_endl;
+
+    // Additional custom non-UCI commands, mainly for debugging
+    else if (token == "flip")  pos.flip();
+    else if (token == "bench") bench(pos, is, states);
+    else if (token == "d")     sync_cout << pos << sync_endl;
+    else if (token == "eval")  sync_cout << Eval::trace(pos) << sync_endl;
+    else
+        sync_cout << "Unknown command: " << cmd << sync_endl;
 
   } while (token != "quit" && argc == 1); // Command line args are one-shot
 }
