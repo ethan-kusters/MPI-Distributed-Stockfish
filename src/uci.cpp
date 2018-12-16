@@ -206,14 +206,7 @@ void UCI::loop(int argc, char* argv[], int my_rank, int comm_sz) {
       cmd += std::string(argv[i]) + " ";
 
   do {
-      if(my_rank != 0) {
-        /*int receivedCmd = 0;
-        //MPI_Recv(&receivedCmd, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
-
-        if(receivedCmd > 0) {
-            mpi_go(pos, receivedCmd, states);
-        }*/
-        
+      if(my_rank != 0) {        
         MPI_Status status;
         MPI_Probe(0, 3, MPI_COMM_WORLD, &status);
         int count;
